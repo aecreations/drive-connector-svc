@@ -10,16 +10,20 @@ import aeGoogleDrive
 
 
 DEBUG = True
-
 APP_NAME = "Drive Connector Service"
 APP_VER = "1.0a0+"
-
 
 def getAppName():
     return APP_NAME
 
 def getAppVer():
     return APP_VER
+
+def sliceReadingList(readingList, startIdx, slcLen):
+    endIdx = startIdx + slcLen
+    slicedRdgList = readingList[slice(startIdx, endIdx)]
+    hasMoreItems = len(readingList[slice(startIdx + slcLen, endIdx + slcLen)]) > 0
+    return (slicedRdgList, hasMoreItems)
 
 def log(msg):
     if DEBUG:
@@ -91,11 +95,18 @@ while True:
             'fileCreatedTime': fileCreatedTime,
             }
     elif msg['id'] == "get-sync-data":
-        # TO DO: Break up data into chunks, 25 bookmarks at a time.
         remoteSyncData = aeGoogleDrive.getSyncData()
+        rdgList = json.loads(remoteSyncData)
+        startIdx = 0
+        if 'startIdx' in msg:
+            startIdx = msg['startIdx']
+        sliceLen = 4
+        if 'sliceLen' in msg:
+            sliceLen = msg['sliceLen']
+        slicedRdgList, hasMoreItems = sliceReadingList(rdgList, startIdx, sliceLen)
         resp = {
-            'syncData': json.loads(remoteSyncData),
-            'hasMoreItems': False,
+            'syncData': slicedRdgList,
+            'hasMoreItems': hasMoreItems,
             }
     elif msg['id'] == "set-sync-data":
         syncData = json.dumps(msg['syncData'])
