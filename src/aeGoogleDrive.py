@@ -193,7 +193,7 @@ def _getNewAccessToken():
 
     # DEBUGGING
     if resp.status_code != 200:
-        _log("POST aeOAPS /token returned status {}, response body:\n{}".format(resp.status_code, json.dumps(resp.json(), indent=2)))
+        _log("POST aeOAPS /token returned HTTP status {}, response body:\n{}".format(resp.status_code, json.dumps(resp.json(), indent=2)))
     # END DEBUGGING
 
     resp.raise_for_status()
