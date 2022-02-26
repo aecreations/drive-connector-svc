@@ -6,6 +6,9 @@ import json
 import requests
 import urllib.parse
 
+# DEBUGGING
+from datetime import datetime
+
 
 AUTHZ_SRV_KEY = "googledrive"
 SYNC_FILENAME = "readnext.json"
@@ -104,7 +107,7 @@ def getLastModifiedTime():
     
 
 #
-# Helpers
+# Helper functions
 #
 
 def _setSyncData(syncData, isNewFile):
@@ -152,7 +155,7 @@ def _getReqHdrs():
 
 
 def _fetch(url, requestOpts, isRetry=False):
-    global _isAccessTokenRefreshed
+    global _oauthClient, _isAccessTokenRefreshed
     rv = None
     method = requestOpts['method']
     args = {}
@@ -162,13 +165,16 @@ def _fetch(url, requestOpts, isRetry=False):
         args['data'] = requestOpts['body']
     resp = requests.request(method, url, **args)
     if resp.status_code == requests.codes.unauthorized:
+        _log("aeGoogleDrive._fetch(): API call to {} returned HTTP status {}".format(url, resp.status_code))
         if isRetry is True:
             # Prevent infinite recursion and just return the error response.
             rv = resp
         else:
+            _log("aeGoogleDrive._fetch(): Access token may be expired. Getting new access token...")
             newAccessToken = _getNewAccessToken()
             _oauthClient['accessToken'] = newAccessToken
             _isAccessTokenRefreshed = True
+            _log("aeGoogleDrive._fetch(): Refreshed access token:\n" + json.dumps(_oauthClient, indent=2))
             requestOpts['headers']['Authorization'] = f"Bearer {newAccessToken}"
             rv = _fetch(url, requestOpts, True)
     else:
@@ -182,8 +188,22 @@ def _getNewAccessToken():
         'grant_type': "refresh_token",
         'refresh_token': _oauthClient['refreshToken']
         }
+    _log("aeGoogleDrive._getNewAccessToken(): Calling aeOAPS /token:\n" + json.dumps(params, indent=2))
     resp = requests.post("https://aeoaps.herokuapp.com/readnext/token", data=params)
-    resp.raise_for_status()   
+
+    # DEBUGGING
+    if resp.status_code != 200:
+        _log("POST aeOAPS /token returned status {}, response body:\n{}".format(resp.status_code, json.dumps(resp.json(), indent=2)))
+    # END DEBUGGING
+
+    resp.raise_for_status()
     respBody = resp.json()
     newAccessToken = respBody['access_token']
     return newAccessToken
+
+
+def _log(msg):
+    with open("debug.txt", "a") as file:
+        dt = datetime.now()
+        file.write("{} {}".format(dt, msg))
+        file.write("\n")
