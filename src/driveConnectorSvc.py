@@ -6,30 +6,38 @@
 import sys
 import struct
 import json
+from datetime import datetime
 import aeGoogleDrive
 
-
 DEBUG = True
+
 APP_NAME = "Drive Connector Service"
 APP_VER = "1.0a0+"
+READING_LIST_SLICE_LENGTH = 4
+
 
 def getAppName():
     return APP_NAME
 
+
 def getAppVer():
     return APP_VER
 
-def sliceReadingList(readingList, startIdx, slcLen):
+
+def sliceReadingList(bkmks, startIdx, slcLen):
     endIdx = startIdx + slcLen
-    slicedRdgList = readingList[slice(startIdx, endIdx)]
-    hasMoreItems = len(readingList[slice(startIdx + slcLen, endIdx + slcLen)]) > 0
-    return (slicedRdgList, hasMoreItems)
+    slicedReadingList = bkmks[slice(startIdx, endIdx)]
+    hasMoreItems = len(bkmks[slice(startIdx + slcLen, endIdx + slcLen)]) > 0
+    return (slicedReadingList, hasMoreItems)
+
 
 def log(msg):
     if DEBUG:
         with open("debug.txt", "a") as file:
-            file.write(msg)
+            dt = datetime.now()
+            file.write("{} {}".format(dt, msg))
             file.write("\n")
+
 
 def getMessage():
     rawLength = sys.stdin.buffer.read(4)
@@ -40,10 +48,12 @@ def getMessage():
     message = json.loads(stdioMsg)
     return message
 
+
 def encodeMessage(msgData):
     encodedContent = json.dumps(msgData).encode('utf-8')
     encodedLength = struct.pack('@I', len(encodedContent))
     return {'length': encodedLength, 'content': encodedContent}
+
 
 def sendMessage(encodedMsg):
     sys.stdout.buffer.write(encodedMsg['length'])
@@ -52,6 +62,11 @@ def sendMessage(encodedMsg):
 
 
 while True:
+    # TO DO: Check for exceptions thrown by calls to aeGoogleDrive functions.
+    # This may occur if the access token has expired and the refresh token is
+    # no longer valid.
+    # If this happens, forward the exception to the WebExtension, where it
+    # should be handled by prompting the user to log in again to Google Drive.
     msg = getMessage()
     resp = None
     if 'id' not in msg:
@@ -96,16 +111,16 @@ while True:
             }
     elif msg['id'] == "get-sync-data":
         remoteSyncData = aeGoogleDrive.getSyncData()
-        rdgList = json.loads(remoteSyncData)
+        bkmks = json.loads(remoteSyncData)
         startIdx = 0
         if 'startIdx' in msg:
             startIdx = msg['startIdx']
-        sliceLen = 4
+        sliceLen = READING_LIST_SLICE_LENGTH
         if 'sliceLen' in msg:
             sliceLen = msg['sliceLen']
-        slicedRdgList, hasMoreItems = sliceReadingList(rdgList, startIdx, sliceLen)
+        slicedReadingList, hasMoreItems = sliceReadingList(bkmks, startIdx, sliceLen)
         resp = {
-            'syncData': slicedRdgList,
+            'syncData': slicedReadingList,
             'hasMoreItems': hasMoreItems,
             }
     elif msg['id'] == "set-sync-data":
@@ -118,9 +133,7 @@ while True:
         resp = {
             'lastModifiedTime': aeGoogleDrive.getLastModifiedTime()
             }
-
     if aeGoogleDrive.isAccessTokenRefreshed():
         resp['newAccessToken'] = aeGoogleDrive.getAccessToken()
-
     if resp is not None:
         sendMessage(encodeMessage(resp))
