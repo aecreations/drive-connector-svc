@@ -12,7 +12,7 @@ import aeGoogleDrive
 DEBUG = True
 
 APP_NAME = "Drive Connector Service"
-APP_VER = "1.0a0+"
+APP_VER = "1.0a1"
 READING_LIST_SLICE_LENGTH = 4
 
 
