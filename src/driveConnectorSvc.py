@@ -8,11 +8,13 @@ import struct
 import json
 from datetime import datetime
 import aeGoogleDrive
+from aeAuthorizationError import AuthorizationError
+
 
 DEBUG = True
 
 APP_NAME = "Drive Connector Service"
-APP_VER = "1.0a1"
+APP_VER = "1.0a1+"
 READING_LIST_SLICE_LENGTH = 4
 
 
@@ -96,44 +98,55 @@ while True:
         msg['syncFileID']
         )
     aeGoogleDrive.init(*initArgs)
-    if msg['id'] == "sync-file-exists":
-        fileExists, syncFileID = aeGoogleDrive.syncFileExists()
+    try:
+        if msg['id'] == "sync-file-exists":
+            fileExists, syncFileID = aeGoogleDrive.syncFileExists()
+            resp = {
+                'syncFileExists': fileExists,
+                'syncFileID': syncFileID,
+                }
+        elif msg['id'] == "create-sync-file":
+            syncData = json.dumps(msg['syncData'])
+            syncFileID, fileCreatedTime = aeGoogleDrive.createSyncFile(syncData)
+            resp = {
+                'syncFileID': syncFileID,
+                'fileCreatedTime': fileCreatedTime,
+                }
+        elif msg['id'] == "get-sync-data":
+            remoteSyncData = aeGoogleDrive.getSyncData()
+            bkmks = json.loads(remoteSyncData)
+            startIdx = 0
+            if 'startIdx' in msg:
+                startIdx = msg['startIdx']
+            sliceLen = READING_LIST_SLICE_LENGTH
+            if 'sliceLen' in msg:
+                sliceLen = msg['sliceLen']
+            slicedReadingList, hasMoreItems = sliceReadingList(bkmks, startIdx, sliceLen)
+            resp = {
+                'syncData': slicedReadingList,
+                'hasMoreItems': hasMoreItems,
+                }
+        elif msg['id'] == "set-sync-data":
+            syncData = json.dumps(msg['syncData'])
+            _, fileModifiedTime = aeGoogleDrive.setSyncData(syncData)
+            resp = {
+                'fileModifiedTime': fileModifiedTime
+                }
+        elif msg['id'] == "get-last-modified-time":        
+            resp = {
+                'lastModifiedTime': aeGoogleDrive.getLastModifiedTime()
+                }
+        if aeGoogleDrive.isAccessTokenRefreshed():
+            resp['newAccessToken'] = aeGoogleDrive.getAccessToken()
+    except AuthorizationError as err:
         resp = {
-            'syncFileExists': fileExists,
-            'syncFileID': syncFileID,
+            'error': {
+                'name': err.name,
+                'message': err.message,
+                }
             }
-    elif msg['id'] == "create-sync-file":
-        syncData = json.dumps(msg['syncData'])
-        syncFileID, fileCreatedTime = aeGoogleDrive.createSyncFile(syncData)
-        resp = {
-            'syncFileID': syncFileID,
-            'fileCreatedTime': fileCreatedTime,
-            }
-    elif msg['id'] == "get-sync-data":
-        remoteSyncData = aeGoogleDrive.getSyncData()
-        bkmks = json.loads(remoteSyncData)
-        startIdx = 0
-        if 'startIdx' in msg:
-            startIdx = msg['startIdx']
-        sliceLen = READING_LIST_SLICE_LENGTH
-        if 'sliceLen' in msg:
-            sliceLen = msg['sliceLen']
-        slicedReadingList, hasMoreItems = sliceReadingList(bkmks, startIdx, sliceLen)
-        resp = {
-            'syncData': slicedReadingList,
-            'hasMoreItems': hasMoreItems,
-            }
-    elif msg['id'] == "set-sync-data":
-        syncData = json.dumps(msg['syncData'])
-        _, fileModifiedTime = aeGoogleDrive.setSyncData(syncData)
-        resp = {
-            'fileModifiedTime': fileModifiedTime
-            }
-    elif msg['id'] == "get-last-modified-time":        
-        resp = {
-            'lastModifiedTime': aeGoogleDrive.getLastModifiedTime()
-            }
-    if aeGoogleDrive.isAccessTokenRefreshed():
-        resp['newAccessToken'] = aeGoogleDrive.getAccessToken()
+    except BaseException as e:
+        sys.stderr.buffer.write("driveConnectorSvc: " + e)
+        sys.stderr.buffer.flush()
     if resp is not None:
         sendMessage(encodeMessage(resp))
