@@ -5,10 +5,11 @@
 import json
 import requests
 import urllib.parse
-
-# DEBUGGING
 from datetime import datetime
+from aeAuthorizationError import AuthorizationError
 
+
+DEBUG = True
 
 AUTHZ_SRV_KEY = "googledrive"
 SYNC_FILENAME = "readnext.json"
@@ -190,20 +191,24 @@ def _getNewAccessToken():
         }
     _log("aeGoogleDrive._getNewAccessToken(): Calling aeOAPS /token:\n" + json.dumps(params, indent=2))
     resp = requests.post("https://aeoaps.herokuapp.com/readnext/token", data=params)
-
-    # DEBUGGING
-    if resp.status_code != 200:
+    if resp.status_code != requests.codes.ok:
         _log("POST aeOAPS /token returned HTTP status {}, response body:\n{}".format(resp.status_code, json.dumps(resp.json(), indent=2)))
-    # END DEBUGGING
-
-    resp.raise_for_status()
+    if resp.status_code == requests.codes.bad_request:
+        errResp = resp.json()
+        if ('error' in errResp and errResp['error']['name'] == "AuthorizationError"):
+            raise AuthorizationError(errResp['error']['message'])
+        else:
+            resp.raise_for_status()
+    else:
+        resp.raise_for_status()
     respBody = resp.json()
     newAccessToken = respBody['access_token']
     return newAccessToken
 
 
 def _log(msg):
-    with open("debug.txt", "a") as file:
-        dt = datetime.now()
-        file.write("{} {}".format(dt, msg))
-        file.write("\n")
+    if DEBUG:
+        with open("debug.txt", "a") as file:
+            dt = datetime.now()
+            file.write("{} {}".format(dt, msg))
+            file.write("\n")
