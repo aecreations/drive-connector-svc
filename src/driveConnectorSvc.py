@@ -64,11 +64,6 @@ def sendMessage(encodedMsg):
 
 
 while True:
-    # TO DO: Check for exceptions thrown by calls to aeGoogleDrive functions.
-    # This may occur if the access token has expired and the refresh token is
-    # no longer valid.
-    # If this happens, forward the exception to the WebExtension, where it
-    # should be handled by prompting the user to log in again to Google Drive.
     msg = getMessage()
     resp = None
     if 'id' not in msg:
@@ -99,6 +94,12 @@ while True:
         )
     aeGoogleDrive.init(*initArgs)
     try:
+        # Catch exceptions thrown by aeGoogleDrive functions.
+        # This may occur if the access token has expired and the refresh token
+        # is no longer valid.
+        # If this happens, forward the exception to the WebExtension,
+        # where it should be handled by prompting the user to reauthorize
+        # their Google Drive account.
         if msg['id'] == "sync-file-exists":
             fileExists, syncFileID = aeGoogleDrive.syncFileExists()
             resp = {
