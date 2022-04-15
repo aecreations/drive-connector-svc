@@ -14,7 +14,7 @@ from aeAuthorizationError import AuthorizationError
 DEBUG = True
 
 APP_NAME = "Drive Connector Service"
-APP_VER = "1.0a2"
+APP_VER = "1.0a2+"
 READING_LIST_SLICE_LENGTH = 4
 
 
