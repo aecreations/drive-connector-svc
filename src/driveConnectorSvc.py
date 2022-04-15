@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 import aeGoogleDrive
 from aeAuthorizationError import AuthorizationError
+from aeNotFoundError import NotFoundError
 
 
 DEBUG = True
@@ -96,10 +97,9 @@ while True:
     try:
         # Catch exceptions thrown by aeGoogleDrive functions.
         # This may occur if the access token has expired and the refresh token
-        # is no longer valid.
+        # is no longer valid, or if the sync file is missing.
         # If this happens, forward the exception to the WebExtension,
-        # where it should be handled by prompting the user to reauthorize
-        # their Google Drive account.
+        # where it should be handled appropriately.
         if msg['id'] == "sync-file-exists":
             fileExists, syncFileID = aeGoogleDrive.syncFileExists()
             resp = {
@@ -139,14 +139,14 @@ while True:
                 }
         if aeGoogleDrive.isAccessTokenRefreshed():
             resp['newAccessToken'] = aeGoogleDrive.getAccessToken()
-    except AuthorizationError as err:
+    except (AuthorizationError, NotFoundError) as err:
         resp = {
             'error': {
                 'name': err.name,
                 'message': err.message,
                 }
             }
-    except BaseException as e:
+    except Exception as e:
         sys.stderr.buffer.write("driveConnectorSvc: " + e)
         sys.stderr.buffer.flush()
     if resp is not None:

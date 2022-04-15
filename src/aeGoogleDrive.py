@@ -7,6 +7,7 @@ import requests
 import urllib.parse
 from datetime import datetime
 from aeAuthorizationError import AuthorizationError
+from aeNotFoundError import NotFoundError
 
 
 DEBUG = True
@@ -101,8 +102,12 @@ def getLastModifiedTime():
         'headers': headers,
         }
     resp = _fetch(f"https://www.googleapis.com/drive/v3/files/{_syncFileID}?{query}", reqOpts)
-    resp.raise_for_status()
     respBody = resp.json()
+    if resp.status_code == requests.codes.not_found:
+        _log("aeGoogleDrive.getLastModifiedTime(): API call to /drive/v3/files/{} returned HTTP status {}".format(_syncFileID, resp.status_code))
+        raise NotFoundError(respBody['error']['message'])
+    else:
+        resp.raise_for_status()
     lastModifiedTime = respBody['modifiedTime']
     return lastModifiedTime
     
@@ -135,8 +140,12 @@ def _setSyncData(syncData, isNewFile):
         }
     fileIDSfx = "" if isNewFile else f"/{_syncFileID}"
     resp = _fetch(f"https://www.googleapis.com/upload/drive/v3/files{fileIDSfx}?{query}", reqOpts)
-    resp.raise_for_status()
     respBody = resp.json()
+    if resp.status_code == requests.codes.not_found:
+        _log("aeGoogleDrive._setSyncData(): API call to /upload/drive/v3/files/{} returned HTTP status {}".format(fileIDSfx, resp.status_code))
+        raise NotFoundError(respBody['error']['message'])
+    else:
+        resp.raise_for_status()
     fileID = respBody['id']
     fileModifiedTime = respBody['modifiedTime']
     if isNewFile:
