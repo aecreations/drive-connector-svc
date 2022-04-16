@@ -39,6 +39,17 @@ def getAccessToken():
     return _oauthClient['accessToken']
 
 
+def getUsername():
+    reqOpts = {
+        'method': "GET",
+        'headers': _getReqHdrs(),
+        }
+    resp = _fetch("https://www.googleapis.com/drive/v3/about?fields=user", reqOpts)
+    resp.raise_for_status()
+    respBody = resp.json()
+    return respBody['user']['emailAddress']
+
+
 def syncFileExists():
     global _syncFileID
     fileExists = False

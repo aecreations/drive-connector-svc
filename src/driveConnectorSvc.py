@@ -100,7 +100,12 @@ while True:
         # is no longer valid, or if the sync file is missing.
         # If this happens, forward the exception to the WebExtension,
         # where it should be handled appropriately.
-        if msg['id'] == "sync-file-exists":
+        if msg['id'] == "get-username":
+            username = aeGoogleDrive.getUsername()
+            resp = {
+                'username': username,
+                }
+        elif msg['id'] == "sync-file-exists":
             fileExists, syncFileID = aeGoogleDrive.syncFileExists()
             resp = {
                 'syncFileExists': fileExists,
